@@ -1,5 +1,7 @@
 import { searchCities, getWeatherByCity } from './weatherAPI';
 
+const token = import.meta.env.VITE_TOKEN;
+
 /**
  * Cria um elemento HTML com as informações passadas
  */
@@ -77,7 +79,7 @@ export function showForecast(forecastList) {
  * Recebe um objeto com as informações de uma cidade e retorna um elemento HTML
  */
 export function createCityElement(cityInfo) {
-  const { name, country, temp, condition, icon } = cityInfo;
+  const { name, country, temp, condition, icon, url } = cityInfo;
 
   const cityElement = createElement('li', 'city');
 
@@ -89,23 +91,37 @@ export function createCityElement(cityInfo) {
 
   const tempElement = createElement('p', 'city-temp', `${temp}º`);
   const conditionElement = createElement('p', 'city-condition', condition);
+  const buttonElement = createElement('button', 'forecast-city-button', 'Ver previsão');
 
   const tempContainer = createElement('div', 'city-temp-container');
   tempContainer.appendChild(conditionElement);
   tempContainer.appendChild(tempElement);
+  tempContainer.appendChild(buttonElement);
 
   const iconElement = createElement('img', 'condition-icon');
   iconElement.src = icon.replace('64x64', '128x128');
+
+  buttonElement.addEventListener('click', async () => {
+    const api = `http://api.weatherapi.com/v1/forecast.json?lang=pt&key=${token}&q=${url}&days=7`;
+    const response = await fetch(api);
+    const data = await response.json();
+
+    const forecastCities = data.forecast.forecastday.map(({ date, day }) => ({
+      date,
+      maxTemp: day.maxtemp_c,
+      minTemp: day.mintemp_c,
+      condition: day.condition.text,
+      icon: day.condition.icon,
+    }));
+    showForecast(forecastCities);
+  });
 
   const infoContainer = createElement('div', 'city-info-container');
   infoContainer.appendChild(tempContainer);
   infoContainer.appendChild(iconElement);
 
-  const forecastBtn = createElement('button', 'city-forecast-button', 'Ver previsão');
-
   cityElement.appendChild(headingElement);
   cityElement.appendChild(infoContainer);
-  cityElement.appendChild(forecastBtn);
 
   return cityElement;
 }
@@ -119,16 +135,22 @@ export async function handleSearch(event) {
 
   const searchInput = document.getElementById('search-input');
   const searchValue = searchInput.value;
-  // searchCities(searchValue);
   const cities = await searchCities(searchValue);
-  const listOfCities = document.getElementById('cities');
 
   if (cities) {
     cities
       .forEach(async (city) => {
         const weatherCity = await getWeatherByCity(city.url);
-        const cidade = await createCityElement(weatherCity);
-        listOfCities.appendChild(cidade);
+        const ul = document.getElementById('cities');
+        const forecastCity = await createCityElement({
+          name: city.name,
+          country: city.country,
+          temp: weatherCity.temp,
+          condition: weatherCity.condition,
+          icon: weatherCity.icon,
+          url: city.url,
+        });
+        ul.appendChild(forecastCity);
       });
   }
 }
